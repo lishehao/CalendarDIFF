@@ -3,9 +3,9 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 AWS_USER="${AWS_USER:-ubuntu}"
-AWS_HOST="${AWS_HOST:-54.152.242.119}"
+AWS_HOST="${AWS_HOST:?Set AWS_HOST to the release host (hostname or IP)}"
 AWS_SSH_KEY="${AWS_SSH_KEY:-$HOME/.ssh/aws-main.pem}"
-AWS_APP_DIR="${AWS_APP_DIR:-/home/ubuntu/apps/CalendarDIFF}"
+AWS_APP_DIR="${AWS_APP_DIR:?Set AWS_APP_DIR to the CalendarDIFF checkout path on the release host}"
 REMOTE_GIT_URL="${REMOTE_GIT_URL:-git@github.com:lishehao/CalendarDIFF.git}"
 DOMAIN="${DOMAIN:-cal.shehao.app}"
 BUNDLE_PATH="${BUNDLE_PATH:-/tmp/calendardiff-release.bundle}"

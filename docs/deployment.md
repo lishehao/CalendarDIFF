@@ -11,9 +11,10 @@ Default `docker-compose.yml` contains five services:
 ## Current AWS host layout
 The current production host uses:
 
-- SSH user: `ubuntu`
-- app dir: `/home/ubuntu/apps/CalendarDIFF`
-- secrets dir: `/home/ubuntu/secrets`
+- SSH user: `<user>` (`AWS_USER`)
+- host: `<your-host>` (`AWS_HOST`)
+- app dir: `<app-dir>` (`AWS_APP_DIR`)
+- secrets dir: `<secrets-dir>` (mounted through `HOST_SECRETS_DIR`)
 
 Shared-host rule:
 
@@ -22,11 +23,11 @@ Shared-host rule:
 - local/dev uses frontend `127.0.0.1:3000` and backend `127.0.0.1:8200`
 - the AWS host runs `frontend` on `127.0.0.1:3000` and `public-service` on `127.0.0.1:8000`
 - CalendarDIFF MCP runs on `127.0.0.1:8766`
-- RPG currently remains separate on `/srv/rpg-demo` with its own backend port `127.0.0.1:8010`
+- RPG currently remains separate in its own directory with its own backend port `127.0.0.1:8010`
 
 Reserve a sibling app dir for future non-CalendarDIFF projects when needed:
 
-- `/home/ubuntu/apps/rpg-demo`
+- a directory next to `<app-dir>`
 
 ## Backend container
 `public-service` runs:
@@ -138,10 +139,16 @@ Operational rule:
 - `postgres` and `redis` stay untouched during the normal release path
 - `rpg.shehao.app` remains untouched
 
+The script needs `AWS_HOST` and `AWS_APP_DIR` and exits if either is unset:
+
+```bash
+AWS_HOST=<your-host> AWS_APP_DIR=<app-dir> scripts/release_aws_main.sh
+```
+
 Optional override:
 
 ```bash
-DEPLOY_SERVICES="frontend public-service mcp-service" scripts/release_aws_main.sh
+AWS_HOST=<your-host> AWS_APP_DIR=<app-dir> DEPLOY_SERVICES="frontend public-service mcp-service" scripts/release_aws_main.sh
 ```
 
 Use that variable only when you intentionally need a different compose target set.
