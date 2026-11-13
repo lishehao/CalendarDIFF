@@ -4,6 +4,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from app.modules.llm_gateway.contracts import LlmInvokeRequest, LlmInvokeResult, ResolvedLlmProfile
 from app.modules.llm_gateway.gateway import LlmGateway
 from app.modules.llm_gateway.runtime_control import (
@@ -17,6 +19,11 @@ from app.modules.llm_gateway.runtime_control import (
 from app.modules.llm_gateway.transport_openai_compat import OpenAICompatTransport
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+EMAIL_POOL_DERIVED_SETS = REPO_ROOT / "tests" / "fixtures" / "private" / "email_pool" / "derived_sets"
+requires_email_pool = pytest.mark.skipif(
+    not EMAIL_POOL_DERIVED_SETS.is_dir(),
+    reason="needs tests/fixtures/private/email_pool/derived_sets (gitignored; generate with: python -m tools.datasets.export_year_timeline_fixtures)",
+)
 
 
 def _profile(*, session_cache_enabled: bool) -> ResolvedLlmProfile:
@@ -174,6 +181,7 @@ def test_gateway_emits_trace_event(monkeypatch) -> None:
 
 
 
+@requires_email_pool
 def test_process_local_email_pool_lists_derived_sets() -> None:
     result = subprocess.run(
         [sys.executable, "scripts/process_local_email_pool.py", "--list-derived-sets"],
@@ -188,6 +196,7 @@ def test_process_local_email_pool_lists_derived_sets() -> None:
 
 
 
+@requires_email_pool
 def test_process_local_email_pool_lists_samples_for_derived_set() -> None:
     result = subprocess.run(
         [sys.executable, "scripts/process_local_email_pool.py", "--list-samples", "--derived-set", "year_timeline_smoke_24"],

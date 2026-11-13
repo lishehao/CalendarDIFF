@@ -191,6 +191,343 @@
         "title": "AgentChangeEditCommitProposalRequest",
         "type": "object"
       },
+      "AgentCommandExecuteRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "language_code": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language Code"
+          },
+          "selected_step_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 50,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Step Ids"
+          }
+        },
+        "title": "AgentCommandExecuteRequest",
+        "type": "object"
+      },
+      "AgentCommandPlanRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "input_text": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Input Text",
+            "type": "string"
+          },
+          "language_code": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language Code"
+          },
+          "scope_id": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Id"
+          },
+          "scope_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "workspace",
+                  "change",
+                  "source",
+                  "family"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Kind"
+          }
+        },
+        "required": [
+          "input_text"
+        ],
+        "title": "AgentCommandPlanRequest",
+        "type": "object"
+      },
+      "AgentCommandRunResponse": {
+        "properties": {
+          "command_id": {
+            "title": "Command Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "executed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executed At"
+          },
+          "execution_results": {
+            "items": {
+              "$ref": "#/components/schemas/AgentCommandStepExecutionResultResponse"
+            },
+            "title": "Execution Results",
+            "type": "array"
+          },
+          "input_text": {
+            "title": "Input Text",
+            "type": "string"
+          },
+          "language_code": {
+            "title": "Language Code",
+            "type": "string"
+          },
+          "language_resolution_source": {
+            "title": "Language Resolution Source",
+            "type": "string"
+          },
+          "owner_user_id": {
+            "title": "Owner User Id",
+            "type": "integer"
+          },
+          "plan": {
+            "items": {
+              "$ref": "#/components/schemas/AgentCommandStepResponse"
+            },
+            "title": "Plan",
+            "type": "array"
+          },
+          "scope_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Id"
+          },
+          "scope_kind": {
+            "enum": [
+              "workspace",
+              "change",
+              "source",
+              "family"
+            ],
+            "title": "Scope Kind",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "planned",
+              "clarification_required",
+              "unsupported",
+              "executing",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "status_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Reason"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "owner_user_id",
+          "input_text",
+          "scope_kind",
+          "language_code",
+          "language_resolution_source",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "AgentCommandRunResponse",
+        "type": "object"
+      },
+      "AgentCommandStepExecutionResultResponse": {
+        "properties": {
+          "error_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Text"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "output_summary": {
+            "additionalProperties": true,
+            "title": "Output Summary",
+            "type": "object"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "succeeded",
+              "failed",
+              "blocked",
+              "skipped"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "step_id": {
+            "title": "Step Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step_id",
+          "status"
+        ],
+        "title": "AgentCommandStepExecutionResultResponse",
+        "type": "object"
+      },
+      "AgentCommandStepResponse": {
+        "properties": {
+          "args": {
+            "additionalProperties": true,
+            "title": "Args",
+            "type": "object"
+          },
+          "depends_on": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Depends On",
+            "type": "array"
+          },
+          "execution_boundary": {
+            "enum": [
+              "read_only",
+              "proposal_or_ticket_chain"
+            ],
+            "title": "Execution Boundary",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "risk_level": {
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Risk Level",
+            "type": "string"
+          },
+          "step_id": {
+            "title": "Step Id",
+            "type": "string"
+          },
+          "target_kind": {
+            "title": "Target Kind",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step_id",
+          "title",
+          "reason",
+          "tool_name",
+          "target_kind",
+          "risk_level",
+          "execution_boundary"
+        ],
+        "title": "AgentCommandStepResponse",
+        "type": "object"
+      },
       "AgentFamilyContextResponse": {
         "properties": {
           "available_next_tools": {
@@ -8509,6 +8846,191 @@
           }
         },
         "summary": "Post Approval Ticket Confirm",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
+    "/agent/commands/plan": {
+      "post": {
+        "operationId": "post_agent_command_plan_agent_commands_plan_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentCommandPlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentCommandRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Agent Command Plan",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
+    "/agent/commands/{command_id}": {
+      "get": {
+        "operationId": "get_agent_command_run_route_agent_commands__command_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "command_id",
+            "required": true,
+            "schema": {
+              "title": "Command Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentCommandRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Agent Command Run Route",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
+    "/agent/commands/{command_id}/execute": {
+      "post": {
+        "operationId": "post_agent_command_execute_agent_commands__command_id__execute_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "command_id",
+            "required": true,
+            "schema": {
+              "title": "Command Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentCommandExecuteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentCommandRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Agent Command Execute",
         "tags": [
           "agents"
         ]

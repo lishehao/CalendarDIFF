@@ -9,8 +9,11 @@ import time
 from pathlib import Path
 
 import httpx
+import pytest
 
 from tools.datasets.year_timeline_scenarios import build_year_timeline_manifest, write_year_timeline_manifest
+
+FULL_SIM_EMAIL_SAMPLES = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "private" / "email_pool" / "year_timeline_full_sim" / "samples.jsonl"
 
 
 def _find_free_port() -> int:
@@ -99,6 +102,10 @@ def test_fake_source_provider_year_timeline_contract(tmp_path: Path) -> None:
             process.wait(timeout=5)
 
 
+@pytest.mark.skipif(
+    not FULL_SIM_EMAIL_SAMPLES.is_file(),
+    reason="needs tests/fixtures/private/email_pool/year_timeline_full_sim/samples.jsonl (gitignored; generate with: python -m tools.datasets.export_year_timeline_fixtures)",
+)
 def test_fake_source_provider_can_overlay_full_sim_email_bucket(tmp_path: Path) -> None:
     manifest = build_year_timeline_manifest()
     manifest_path = tmp_path / "year_timeline_manifest.json"

@@ -12,7 +12,8 @@ authors = [
   { name = "Deadline Diff Watcher Team" }
 ]
 dependencies = [
-  "fastapi>=0.115.0,<1.0.0",
+  "fastapi>=0.115.0,<0.130.0",
+  "starlette<1.0.0",
   "uvicorn[standard]>=0.30.0,<1.0.0",
   "sqlalchemy>=2.0.0,<3.0.0",
   "alembic>=1.13.0,<2.0.0",
