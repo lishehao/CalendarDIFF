@@ -1,276 +1,123 @@
 # CalendarDIFF
 
-CalendarDIFF 是一个单机部署、单体后端的截止日期变更工作台，用来把课程里真正影响成绩的时间变化收敛到一个流程里。
+一个监视学生课程日历订阅和邮箱的工具：把截止日期的变化整理成可审阅的 diff，并发出提醒。
 
-它不是一个“所有课程邮件分类器”。
-它的核心目标是：
+[English](README.md)
 
-1. 接入 Canvas ICS 和 Gmail
-2. 建立 canonical baseline
-3. 产出安全可审阅的 proposal
-4. 把后续 replay 变化收口到一个日常审核流程
+## 状态
 
-## 当前产品形态
+不再维护。
 
-当前用户可见的主表面：
+CalendarDIFF 写于 2026 年初，目的是把一整套系统从头到尾接通：数据源接入、解析、canonical 事件库、审核队列、Web 界面和通知。动手之前没有先确认学生是否需要它。目前没有人在用。
 
-- `Overview`
-- `Sources`
-- `Changes`
-- `Families`
-- `Manual`
-- `Settings`
+代码可以在本地跑起来（步骤见下），大部分测试能通过，但没有线上实例，也没有继续开发的计划。
 
-`Changes` 内部的重要区分：
+## 怎么跑
 
-- `Initial Review` 仍是首次导入后的基线审核 bucket
-- `Changes` 仍是承载基线审核和日常 replay 审核的单一 review surface
+以下步骤在一个全新 clone 上启动后端和前端。验证时用的是 Python 3.12；后端镜像用 Python 3.11（`Dockerfile`），前端镜像用 Node 20（`frontend/Dockerfile`）。
 
-推荐用户心智：
+### 1. PostgreSQL 和 Redis
 
-1. 注册 / 登录
-2. 完成 onboarding
-3. 接入必需的 Canvas ICS
-4. 按需接入 Gmail
-5. 选择初始 monitoring window
-6. 在 `Changes` 中清掉基线审核项
-7. 继续在 `Changes` 中处理日常 replay 审核
-
-## 默认运行时
-
-CalendarDIFF 现在默认只运行一个后端进程。
-
-- 后端入口：`services.app_api.main:app`
-- 前端：`frontend/` 下的 Next.js
-- 基础设施：PostgreSQL + Redis
-
-默认本地端口：
-
-- Backend: `8200`
-- Frontend: `3000`
-- PostgreSQL: `5432`
-- Redis: `6379`
-
-旧的 split-service 拓扑不再是默认仓库路径。
-
-## 本地启动
-
-1. 复制 `.env.example` 为 `.env` 并填写必要配置。
-2. 安装后端依赖。
-3. 安装前端依赖：
+Docker 在运行时：
 
 ```bash
-cd frontend && npm install
+docker compose up -d postgres redis
 ```
 
-4. 启动默认栈：
+这会在 `5432` 启动 PostgreSQL 16（数据库 `deadline_diff`，用户名和密码都是 `postgres`），在 `6379` 启动 Redis 7，和 `.env.example` 一致。
+
+不用 Docker 的话，自己起 PostgreSQL 和 Redis，为应用建一个数据库，再把 `.env` 里的 `DATABASE_URL` 和 `REDIS_URL` 指过去。
+
+### 2. 后端
 
 ```bash
-./scripts/dev_stack.sh up
+cp .env.example .env
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+set -a; source .env; set +a
+python -m alembic upgrade head
+SERVICE_NAME=backend PORT=8200 ./scripts/start_service.sh
 ```
 
-常用命令：
-
-```bash
-./scripts/dev_stack.sh status
-./scripts/dev_stack.sh logs backend
-./scripts/dev_stack.sh logs frontend
-./scripts/dev_stack.sh down
-./scripts/dev_stack.sh down --infra
-./scripts/dev_stack.sh reset
-```
-
-健康检查：
+另开一个终端检查：
 
 ```bash
 curl http://127.0.0.1:8200/health
 ```
 
-## 直接启动后端
+给 `./scripts/start_service.sh` 加上 `RUN_MIGRATIONS=true` 时，它会自己跑迁移。
 
-```bash
-SERVICE_NAME=backend RUN_MIGRATIONS=true PORT=8200 ./scripts/start_service.sh
-```
-
-`SERVICE_NAME` 只接受 `backend`。
-
-## 公开 HTTP 接口
-
-当前公开 route group：
-
-- `/auth/*`
-- `/agent/*`
-- `/settings/profile`
-- `/settings/mcp-*`
-- `/settings/channel-*`
-- `/sources/*`
-- `/sync-requests/*`
-- `/onboarding/*`
-- `/changes*`
-- `/families*`
-- `/manual/events*`
-- `/health`
-
-当前 onboarding 相关接口：
-
-- `POST /onboarding/registrations`
-- `GET /onboarding/status`
-- `POST /onboarding/canvas-ics`
-- `POST /onboarding/gmail/oauth-sessions`
-- `POST /onboarding/gmail-skip`
-- `POST /onboarding/monitoring-window`
-
-## 运行时真相
-
-`sync_requests` 是当前唯一用户可见的运行时状态机。
-
-细粒度运行时真相在：
-
-- `stage`
-- `substage`
-- `stage_updated_at`
-- `progress_json`
-
-用户可见的 source posture 和 workspace posture 都应该基于这些显式状态生成，而不是继续从旧 payload 里猜。
-
-## 当前已上线的产品 contract
-
-前端现在已经可以直接消费：
-
-- `GET /changes/summary`
-  - `workspace_posture`
-- `GET /changes`
-  - 每条 item 上的 `decision_support`
-- `GET /sources`
-  - `source_product_phase`
-  - `source_recovery`
-- `GET /sources/{source_id}/observability`
-  - `bootstrap_summary`
-  - `source_product_phase`
-  - `source_recovery`
-
-## 可选集成
-
-当前仍支持：
-
-- Gmail OAuth
-- Canvas ICS
-- SMTP
-- fixture / probe 脚本
-
-## Agent generation gateway
-
-当前 agent proposal / approval / MCP contract 默认仍然是 deterministic。
-
-现在额外提供一层可选的内部 proposal copy gateway，挂在 `llm_gateway` 之上：
-
-- `AGENT_GENERATION_MODE=deterministic` 保持当前稳定行为
-- `AGENT_GENERATION_MODE=llm_assisted` 只允许后端通过 `profile_family=\"agent\"` 改写 proposal 的 `summary` 和 `reason`
-
-这层 gateway 不能改变：
-
-- suggested action
-- payload kind
-- 是否可创建 approval ticket
-- MCP tool surface
-- confirm 阶段的 drift protection
-
-部署规则：
-
-- BERT / Gmail secondary filter 不是必需运行路径
-- 生产默认仍应保持：
-  - `GMAIL_SECONDARY_FILTER_MODE=off`
-  - `GMAIL_SECONDARY_FILTER_PROVIDER=noop`
-
-推荐架构约束：
-
-- 把 Gmail secondary filter 当成可插拔模块，而不是生产必需依赖
-- 训练/评估资产与主运行路径分开
-- 只通过配置切换运行模式：
-  - `off`
-  - `shadow`
-  - `enforce`
-- onboarding、source intake、review、deploy health 都不能依赖 BERT 模块在线
-
-## OpenAPI
-
-默认快照：
-
-```text
-contracts/openapi/public-service.json
-```
-
-刷新方式：
-
-```bash
-python scripts/update_openapi_snapshots.py
-```
-
-## 部署
-
-当前生产环境：
-
-- 域名：`cal.shehao.app`
-- 主机：`ubuntu@54.152.242.119`
-- 应用目录：`/home/ubuntu/apps/CalendarDIFF`
-
-共享主机规则：
-
-- CalendarDIFF 只拥有 `cal.shehao.app`
-- RPG 保持在 `rpg.shehao.app`
-
-改线上前先读：
-
-- `skills/aws-release/SKILL.md`
-- `docs/deployment.md`
-- `docs/nginx_live_routing_architecture.md`
-
-常规 AWS 同步入口：
-
-```bash
-scripts/release_aws_main.sh
-```
-
-这个脚本现在是完整发布动作，不只是同步 git：
-
-- 把 AWS checkout 同步到本地 `HEAD`
-- 重建并重启 `frontend`、`public-service` 和 `mcp-service`
-- 校验 `health` 与 `login`
-
-## 文档索引
-
-当前 repo 真相只认少数几份稳定文档：
-
-- `docs/README.md`
-- `docs/project_structure.md`
-- `docs/architecture.md`
-- `docs/api_surface_current.md`
-- `docs/deployment.md`
-- `docs/event_contracts.md`
-- `docs/frontend_backend_contracts.md`
-
-`specs/` 只保留为带日期的实现 handoff，不再作为当前真相文档。
-
-## 验证基线
-
-后端回归：
-
-```bash
-pytest tests/test_review_items_summary_api.py \
-  tests/test_review_change_source_summary_api.py \
-  tests/test_source_sync_progress_api.py \
-  tests/test_source_read_bridge.py \
-  tests/test_openapi_contract_snapshots.py \
-  tests/test_review_changes_unified.py \
-  tests/test_review_changes_batch_api.py \
-  tests/test_review_edits_api.py
-```
-
-前端回归：
+### 3. 前端
 
 ```bash
 cd frontend
-npm run typecheck
-npm run lint
-NEXT_DIST_DIR=.next-prod npm run build
+cp .env.local.example .env.local
+npm install
+npm run dev -- --hostname 127.0.0.1 --port 3000
 ```
+
+打开 `http://127.0.0.1:3000`。`frontend/.env.local` 里的 `BACKEND_API_KEY` 必须和 `.env` 里的 `APP_API_KEY` 一致（两个示例文件用的是同一个占位值）。
+
+`.env` 已存在、`frontend/node_modules` 已安装时，`./scripts/dev_stack.sh up` 可以一条命令完成第 1 到 3 步。它需要 Docker。
+
+### 4. 测试
+
+测试需要 PostgreSQL 和 Redis，会自己创建和删除测试库。
+
+```bash
+TEST_DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/deadline_diff_test \
+REDIS_URL=redis://127.0.0.1:6379/15 \
+python -m pytest -q
+```
+
+全新 clone 上会失败或跳过的测试见“限制”。
+
+## 设计
+
+- **后端：** 一个 FastAPI 进程（`services/app_api/main.py`），底层是 PostgreSQL（SQLAlchemy、Alembic 迁移）和 Redis（任务队列和 LLM 请求限流）。模块边界在 `app/modules/` 下。
+- **前端：** `frontend/` 下的 Next.js 应用，通过 `BACKEND_BASE_URL` 访问后端。
+- **接入：** Canvas ICS 订阅和 Gmail（OAuth，只读）作为数据源轮询。新增或变化的条目经过解析，再和 canonical 事件基线比对。
+- **审核：** 首次导入形成基线，用户审核一次。之后的变化进入同一个审核队列（`Changes`），每条变更被批准、修改或拒绝之后才会写入基线。开启时通过 SMTP 发通知。
+- **Agent 和 MCP：** 内部 gateway（`app/modules/agents/gateway.py`）和 MCP server（`services/mcp_server/main.py`）提供只读查询、proposal 和 approval ticket。
+
+更详细的文档：
+
+- [PURPOSE.md](PURPOSE.md)：系统要检测什么、忽略什么
+- [docs/architecture.md](docs/architecture.md)：运行时模型和模块边界
+- [docs/project_structure.md](docs/project_structure.md)：仓库结构
+- [docs/api_surface_current.md](docs/api_surface_current.md)：HTTP 路由
+- [docs/frontend_backend_contracts.md](docs/frontend_backend_contracts.md)：前端依赖的接口约定
+- [docs/README.md](docs/README.md)：其余文档索引
+
+OpenAPI 快照在 `contracts/openapi/public-service.json`，用 `python scripts/update_openapi_snapshots.py` 刷新。
+
+## 限制
+
+- **解析需要 LLM。** ICS 和 Gmail 条目都通过 `app/modules/llm_gateway` 解析，需要在 `.env` 里配置 `LLM_API_KEY`、`LLM_MODEL` 和 `LLM_BASE_URL`。不配置时后端仍能启动，但解析会报 `LLM_API_KEY is not configured`。用 LLM 改写 agent proposal 文案（`AGENT_GENERATION_MODE=llm_assisted`）和 `training/` 下的 BERT Gmail 过滤器是可选的，默认关闭。
+- **Gmail 需要你自己的 Google OAuth client。** 把 `GMAIL_OAUTH_CLIENT_SECRETS_FILE` 指向一个 client secrets 文件。
+- **依赖生成 fixture 的测试在全新 clone 上会跳过。** 有三个测试读取 `tests/fixtures/private/email_pool/`，这个目录被 gitignore，缺失时跳过。`python -m tools.datasets.export_year_timeline_fixtures` 会根据合成的学年时间线生成这些 fixture；`tests/test_year_timeline_fixture_export.py` 运行时也会顺带生成，所以在同一个 clone 里第二次跑测试时它们不再跳过。第二次运行时 `test_fake_source_provider_can_overlay_full_sim_email_bucket` 会失败，因为 `scripts/fake_source_provider.py` 从一个写死的绝对路径读取 email pool（见下）。
+- **训练相关测试会跳过**，除非装了 `evaluate`、`numpy`、`torch`、`datasets` 和 `transformers`。它们不在 `requirements.txt` 里。
+- **全新 clone 上有三个测试失败：**
+  - `tests/test_full_repo_validation_runner.py` 里的两个 preflight 测试，因为 `run_preflight` 还会检查磁盘上的 `frontend/node_modules`、`data/` 下的合成 manifest 和生成的 email pool；
+  - `tests/test_oauth_runtime_config.py::test_frontend_app_base_url_falls_back_to_first_public_origin`，测试期望 `PUBLIC_WEB_ORIGINS` 的第二项，而代码返回第一项。
+- **写死的本地路径。** 下面这些文件里有原作者机器上的绝对路径，换一台机器不改就用不了：
+  - `scripts/compare_gmail_cache_modes.py`
+  - `scripts/fake_source_provider.py`
+  - `scripts/probe_gmail_live_accuracy.py`
+  - `scripts/probe_real_llm_usage.py`
+  - `specs/frontend/2026-03-23-agent-entry-surfaces/GUIDANCE_PROMPT.md`
+  - `specs/frontend/2026-03-23-agent-entry-surfaces/OUTPUT.md`
+  - `specs/frontend/2026-03-23-perceived-performance-tuning/GUIDANCE_PROMPT.md`
+  - `specs/frontend/2026-03-23-perceived-performance-tuning/OUTPUT.md`
+- **`scripts/run_full_repo_validation.py`** 依赖原作者的本地环境，在全新 clone 上跑不通。
+- **依赖上限：** `fastapi` 限制在 `0.130` 以下，`starlette` 限制在 `1.0` 以下。用更新的版本（例如 FastAPI 0.162 搭配 Starlette 1.10）时，应用启动会报 `OAuth callback route is not registered in input service app`。
+
+## 谁写了什么
+
+Who wrote what: TODO(owner).
+
+## 许可
+
+No license has been chosen.（尚未选择许可证。）

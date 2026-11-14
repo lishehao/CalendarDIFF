@@ -1,335 +1,123 @@
 # CalendarDIFF
 
-CalendarDIFF is a single-host, monolith-style app for keeping grade-relevant deadline changes in one workflow.
+A tool that watches a student's course calendar feeds and email, turns changes to deadlines into a reviewable diff, and alerts on them.
 
-It does not try to classify all course communication.
-Its job is to:
+[中文说明](README.zh-CN.md)
 
-1. ingest Canvas ICS and Gmail signals
-2. build a canonical event baseline
-3. surface safe review proposals
-4. keep ongoing replay changes in one daily review workflow
+## Status
 
-## Product shape
+Not maintained.
 
-Current user-facing product surfaces:
+CalendarDIFF was built in early 2026 as an exercise in connecting a full system end to end: source ingestion, parsing, a canonical event store, a review queue, a web UI and notifications. It was built without first checking whether students needed it. It is not in use.
 
-- `Overview`
-- `Sources`
-- `Changes`
-- `Families`
-- `Manual`
-- `Settings`
+The code runs locally (steps below) and most of the test suite passes, but there is no hosted instance and no plan to develop it further.
 
-Important review distinction inside `Changes`:
+## How to run
 
-- `Initial Review` remains the baseline review bucket after first import
-- `Changes` remains the single review surface for both baseline and replay work
+These steps start the backend and frontend on a fresh clone. They were checked with Python 3.12; the backend image uses Python 3.11 (`Dockerfile`) and the frontend image uses Node 20 (`frontend/Dockerfile`).
 
-The intended user flow is:
+### 1. PostgreSQL and Redis
 
-1. register or sign in
-2. finish onboarding
-3. connect required Canvas ICS
-4. optionally connect Gmail
-5. choose the initial monitoring window
-6. clear baseline items in `Changes`
-7. keep using `Changes` for day-to-day replay review
-
-## Runtime model
-
-CalendarDIFF now runs as one backend process by default.
-
-- Backend: `services.app_api.main:app`
-- Frontend: Next.js app in `frontend/`
-- Infra: PostgreSQL + Redis
-
-Default local ports:
-
-- Backend: `8200`
-- Frontend: `3000`
-- PostgreSQL: `5432`
-- Redis: `6379`
-
-Legacy split-service entrypoints are no longer the default repo path.
-
-## Local setup
-
-1. Copy `.env.example` to `.env` and fill in required values.
-2. Install backend dependencies.
-3. Install frontend dependencies:
+With Docker running:
 
 ```bash
-cd frontend && npm install
+docker compose up -d postgres redis
 ```
 
-4. Start the default stack:
+This starts PostgreSQL 16 on `5432` (database `deadline_diff`, user and password `postgres`) and Redis 7 on `6379`, which match `.env.example`.
+
+Without Docker, run your own PostgreSQL and Redis, create a database for the app, and point `DATABASE_URL` and `REDIS_URL` in `.env` at them.
+
+### 2. Backend
 
 ```bash
-./scripts/dev_stack.sh up
+cp .env.example .env
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+set -a; source .env; set +a
+python -m alembic upgrade head
+SERVICE_NAME=backend PORT=8200 ./scripts/start_service.sh
 ```
 
-Useful commands:
-
-```bash
-./scripts/dev_stack.sh status
-./scripts/dev_stack.sh logs backend
-./scripts/dev_stack.sh logs frontend
-./scripts/dev_stack.sh down
-./scripts/dev_stack.sh down --infra
-./scripts/dev_stack.sh reset
-```
-
-Health check:
+Check it from another shell:
 
 ```bash
 curl http://127.0.0.1:8200/health
 ```
 
-Full local validation:
+`./scripts/start_service.sh` with `RUN_MIGRATIONS=true` runs the migration step itself.
 
-```bash
-python scripts/run_full_repo_validation.py
-```
-
-Validation rule:
-
-- local Redis is expected on `127.0.0.1:6379`
-- the validation runner reuses isolated Redis DB indexes per phase
-- Docker Desktop is optional if PostgreSQL on `5432` and Redis on `6379` are already reachable
-
-## Direct backend run
-
-```bash
-SERVICE_NAME=backend RUN_MIGRATIONS=true PORT=8200 ./scripts/start_service.sh
-```
-
-`SERVICE_NAME` only accepts `backend`.
-
-## Public HTTP surface
-
-Current public route groups:
-
-- `/auth/*`
-- `/agent/*`
-- `/settings/profile`
-- `/settings/mcp-*`
-- `/settings/channel-*`
-- `/sources/*`
-- `/sync-requests/*`
-- `/onboarding/*`
-- `/changes*`
-- `/families*`
-- `/manual/events*`
-- `/health`
-
-Current onboarding endpoints include:
-
-- `POST /onboarding/registrations`
-- `GET /onboarding/status`
-- `POST /onboarding/canvas-ics`
-- `POST /onboarding/gmail/oauth-sessions`
-- `POST /onboarding/gmail-skip`
-- `POST /onboarding/monitoring-window`
-
-## Runtime truth
-
-`sync_requests` is the single user-visible runtime state machine.
-
-Fine-grained runtime truth lives on:
-
-- `stage`
-- `substage`
-- `stage_updated_at`
-- `progress_json`
-
-User-facing source posture and workbench posture are derived from explicit runtime state rather than old incidental payload inference.
-
-## Product contracts already in use
-
-Current backend contracts exposed to the frontend include:
-
-- `GET /changes/summary`
-  - `workspace_posture`
-- `GET /changes`
-  - `decision_support` on each change item
-- `GET /sources`
-  - `source_product_phase`
-  - `source_recovery`
-- `GET /sources/{source_id}/observability`
-  - `bootstrap_summary`
-  - `source_product_phase`
-  - `source_recovery`
-
-## Optional integrations
-
-Supported integrations remain:
-
-- Gmail OAuth
-- Canvas ICS
-- SMTP delivery
-- fixture builders and probe scripts
-
-## Agent generation gateway
-
-The agent proposal/approval/MCP contract remains deterministic by default.
-
-An optional internal proposal-copy gateway can ride on top of `llm_gateway`:
-
-- `AGENT_GENERATION_MODE=deterministic` keeps the current stable behavior
-- `AGENT_GENERATION_MODE=llm_assisted` lets the backend rewrite proposal `summary` and `reason` via `profile_family="agent"`
-
-This gateway must not change:
-
-- suggested action
-- payload kind
-- approval-ticket eligibility
-- MCP tool surface
-- confirm-time drift protection
-
-## LLM gateway
-
-`llm_gateway` is now the shared model-invocation kernel for:
-
-- named provider registry
-- vendor/protocol adapters
-- structured JSON extraction
-- streaming normalization
-- same-vendor fallback
-- per-call trace and usage persistence
-
-Current supported vendor families:
-
-- `openai`
-- `gemini`
-- `dashscope_openai`
-
-Current supported protocols:
-
-- `responses`
-- `chat_completions`
-- `gemini_generate_content`
-
-Configuration rule:
-
-- prefer named providers via `INGESTION_LLM_PROVIDER_ID` and `AGENT_LLM_PROVIDER_ID`
-- runtime queue orchestration still lives in `runtime.llm`; `llm_gateway` does not own parse-task claim/ack/retry
-
-## Internal agent gateway
-
-Agent reads, proposal creation, approval tickets, and recent activity now share one backend application boundary:
-
-- internal entry: `app/modules/agents/gateway.py`
-- web surface: `app/modules/agents/router.py`
-- MCP surface: `services/mcp_server/main.py`
-
-Design rule:
-
-- router and MCP should reuse `agents.gateway`
-- `agents.gateway` may reuse context/proposal/approval services
-- future frontend copilot entrypoints should bind to the same gateway contract instead of stitching lower-level services directly
-
-Operational rule:
-
-- BERT / Gmail secondary filtering is not part of the required deployable path
-- production should continue to work with:
-  - `GMAIL_SECONDARY_FILTER_MODE=off`
-  - `GMAIL_SECONDARY_FILTER_PROVIDER=noop`
-
-Recommended architecture stance:
-
-- treat the Gmail secondary filter as a pluggable module, not a required runtime dependency
-- keep training/evaluation artifacts separate from the production-critical path
-- allow runtime switching by config only:
-  - `off`
-  - `shadow`
-  - `enforce`
-- never make onboarding, source intake, review, or deploy health depend on the BERT module being available
-
-## OpenAPI
-
-Canonical snapshot:
-
-```text
-contracts/openapi/public-service.json
-```
-
-Refresh it with:
-
-```bash
-python scripts/update_openapi_snapshots.py
-```
-
-## Deployment
-
-Current production host:
-
-- domain: `cal.shehao.app`
-- host: `ubuntu@54.152.242.119`
-- app dir: `/home/ubuntu/apps/CalendarDIFF`
-
-Shared-host rule:
-
-- CalendarDIFF owns only `cal.shehao.app`
-- RPG stays separate on `rpg.shehao.app`
-
-Read these before host changes:
-
-- `skills/aws-release/SKILL.md`
-- `docs/deployment.md`
-- `docs/nginx_live_routing_architecture.md`
-
-Normal AWS sync path:
-
-```bash
-scripts/release_aws_main.sh
-```
-
-That script is a full release step, not just a git sync:
-
-- syncs the AWS checkout to local `HEAD`
-- rebuilds and restarts `frontend`, `public-service`, and `mcp-service`
-- verifies `health` and `login`
-
-## Docs map
-
-Current repo truth is split into a small set of stable docs:
-
-- `docs/README.md`
-- `docs/project_structure.md`
-- `docs/architecture.md`
-- `docs/api_surface_current.md`
-- `docs/deployment.md`
-- `docs/event_contracts.md`
-- `docs/frontend_backend_contracts.md`
-
-Use `specs/` only for dated implementation handoffs, not as the current source of truth.
-
-## Verification baseline
-
-Backend regression:
-
-```bash
-pytest tests/test_review_items_summary_api.py \
-  tests/test_review_change_source_summary_api.py \
-  tests/test_source_sync_progress_api.py \
-  tests/test_source_read_bridge.py \
-  tests/test_openapi_contract_snapshots.py \
-  tests/test_review_changes_unified.py \
-  tests/test_review_changes_batch_api.py \
-  tests/test_review_edits_api.py
-```
-
-Frontend regression:
+### 3. Frontend
 
 ```bash
 cd frontend
-npm run typecheck
-npm run lint
-NEXT_DIST_DIR=.next-prod npm run build
+cp .env.local.example .env.local
+npm install
+npm run dev -- --hostname 127.0.0.1 --port 3000
 ```
 
-Full repo validation wraps those checks plus:
+Open `http://127.0.0.1:3000`. `BACKEND_API_KEY` in `frontend/.env.local` must match `APP_API_KEY` in `.env` (both examples use the same placeholder).
 
-- `scripts/run_agent_claw_strict_eval.py`
-- `scripts/run_year_timeline_replay_smoke.py`
+`./scripts/dev_stack.sh up` does steps 1 to 3 in one command once `.env` exists and `frontend/node_modules` is installed. It needs Docker.
+
+### 4. Tests
+
+The tests need PostgreSQL and Redis. They create and drop their own database.
+
+```bash
+TEST_DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/deadline_diff_test \
+REDIS_URL=redis://127.0.0.1:6379/15 \
+python -m pytest -q
+```
+
+See Limits for the tests that fail or skip on a fresh clone.
+
+## Design
+
+- **Backend:** one FastAPI process (`services/app_api/main.py`) over PostgreSQL (SQLAlchemy, Alembic migrations) and Redis (job queues and the LLM request limiter). Module boundaries are under `app/modules/`.
+- **Frontend:** a Next.js app in `frontend/` that talks to the backend through `BACKEND_BASE_URL`.
+- **Ingestion:** Canvas ICS feeds and Gmail (OAuth, read only) are polled as sources. New or changed items go through a parse step and are matched against a canonical event baseline.
+- **Review:** the first import becomes a baseline that the user reviews once. Later changes land in a single review queue (`Changes`), where each proposed change is approved, edited or rejected before it touches the baseline. Notifications go out by SMTP when enabled.
+- **Agent and MCP:** an internal gateway (`app/modules/agents/gateway.py`) and an MCP server (`services/mcp_server/main.py`) expose read access, proposals and approval tickets.
+
+Deeper docs:
+
+- [PURPOSE.md](PURPOSE.md): what the system is meant to detect and what it ignores
+- [docs/architecture.md](docs/architecture.md): runtime model and module boundaries
+- [docs/project_structure.md](docs/project_structure.md): repository layout
+- [docs/api_surface_current.md](docs/api_surface_current.md): HTTP routes
+- [docs/frontend_backend_contracts.md](docs/frontend_backend_contracts.md): contracts the frontend relies on
+- [docs/README.md](docs/README.md): index of the rest
+
+The OpenAPI snapshot is `contracts/openapi/public-service.json`; refresh it with `python scripts/update_openapi_snapshots.py`.
+
+## Limits
+
+- **The parse step needs an LLM.** Both ICS and Gmail items are parsed through `app/modules/llm_gateway`, which needs `LLM_API_KEY`, `LLM_MODEL` and `LLM_BASE_URL` in `.env`. Without them the backend still starts, but parsing fails with `LLM_API_KEY is not configured`. The LLM rewrite of agent proposal text (`AGENT_GENERATION_MODE=llm_assisted`) and the BERT Gmail filter under `training/` are optional and off by default.
+- **Gmail needs your own Google OAuth client.** Set `GMAIL_OAUTH_CLIENT_SECRETS_FILE` to a client secrets file.
+- **Tests that need generated fixtures skip on a fresh clone.** Three tests read `tests/fixtures/private/email_pool/`, which is gitignored, and skip when it is missing. `python -m tools.datasets.export_year_timeline_fixtures` writes those fixtures from the synthetic year timeline, and `tests/test_year_timeline_fixture_export.py` also writes them as a side effect, so a second test run in the same clone no longer skips them. On that second run `test_fake_source_provider_can_overlay_full_sim_email_bucket` fails, because `scripts/fake_source_provider.py` reads the email pool from a hard-coded absolute path (see below).
+- **The training test skips** unless `evaluate`, `numpy`, `torch`, `datasets` and `transformers` are installed. They are not in `requirements.txt`.
+- **Three tests fail on a fresh clone:**
+  - two preflight tests in `tests/test_full_repo_validation_runner.py`, because `run_preflight` also checks for `frontend/node_modules`, the synthetic manifest under `data/` and the generated email pool on disk;
+  - `tests/test_oauth_runtime_config.py::test_frontend_app_base_url_falls_back_to_first_public_origin`, which expects the second entry of `PUBLIC_WEB_ORIGINS` while the code returns the first.
+- **Hard-coded local paths.** These files contain absolute paths from the original author's machine and will not work elsewhere without editing:
+  - `scripts/compare_gmail_cache_modes.py`
+  - `scripts/fake_source_provider.py`
+  - `scripts/probe_gmail_live_accuracy.py`
+  - `scripts/probe_real_llm_usage.py`
+  - `specs/frontend/2026-03-23-agent-entry-surfaces/GUIDANCE_PROMPT.md`
+  - `specs/frontend/2026-03-23-agent-entry-surfaces/OUTPUT.md`
+  - `specs/frontend/2026-03-23-perceived-performance-tuning/GUIDANCE_PROMPT.md`
+  - `specs/frontend/2026-03-23-perceived-performance-tuning/OUTPUT.md`
+- **`scripts/run_full_repo_validation.py`** expects the author's local setup and does not pass on a fresh clone.
+- **Dependency pins:** `fastapi` is held below `0.130` and `starlette` below `1.0`. With newer releases (for example FastAPI 0.162 with Starlette 1.10) the app fails at startup with `OAuth callback route is not registered in input service app`.
+
+## Who wrote what
+
+Who wrote what: TODO(owner).
+
+## License
+
+No license has been chosen.

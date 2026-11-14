@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import pytest
+
+for _module in ("evaluate", "numpy", "torch", "datasets", "transformers"):
+    pytest.importorskip(_module, reason=f"training extras not installed ({_module}); not in requirements.txt")
+
 from training.gmail_secondary_filter import train_distilbert as trainer
 
 
