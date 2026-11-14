@@ -116,7 +116,7 @@ OpenAPI 快照在 `contracts/openapi/public-service.json`，用 `python scripts/
 
 ## 谁写了什么
 
-Who wrote what: TODO(owner).
+代码几乎全部由 coding agent 编写。方向和需求由我定：监听哪些来源，截止时间的变化怎样变成可审阅的 diff，什么时候提醒。
 
 ## 许可
 
