@@ -116,7 +116,7 @@ The OpenAPI snapshot is `contracts/openapi/public-service.json`; refresh it with
 
 ## Who wrote what
 
-Who wrote what: TODO(owner).
+Coding agents wrote almost all of the code. I set the direction and defined what the system should do: which sources to watch, how a deadline change becomes a reviewable diff, and when to alert.
 
 ## License
 
